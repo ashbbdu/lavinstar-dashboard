@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 import { Sequelize } from 'sequelize';
 dotenv.config();
 
-const sequelize = new Sequelize('lavinstar', 'root', 'ash@Compunnel09', {
+const sequelize = new Sequelize(process.env.DB_NAME as string, process.env.USER_NAME as string, 'ash@Compunnel09' , {
     host : "localhost",
     dialect: 'mysql'
   });  

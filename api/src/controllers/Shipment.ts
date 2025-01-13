@@ -1,14 +1,10 @@
 import { Request, Response } from "express";
 import { Op, Sequelize, col, fn } from "sequelize";
 import { Shipment } from "../models/Shipment";
-import { getExtendedStartEndDate } from "../utils/datematch";
+import {  calculateCustomYears, getExtendedStartEndDate } from "../utils/datematch";
 export const getAllShipment = async (req: Request, res: Response) => {
   try {
     const shipmentData = await Shipment.findAll();
-    console.log("inside try");
-    
-    console.log(shipmentData, "shipmentData");
-
     res.json({
       success: true,
       shipmentData,
@@ -18,7 +14,7 @@ export const getAllShipment = async (req: Request, res: Response) => {
     console.log(error);
     res.json({
       success: false,
-      msg : "Internal Server Error !"
+      msg: "Internal Server Error !",
     });
   }
 };
@@ -112,12 +108,18 @@ export const getShipmentData = async (req: Request, res: Response) => {
       });
     }
 
-    const { adjustedStart, endDate } = getExtendedStartEndDate(
+    const totalDays = calculateCustomYears(start, end);
+
+    const { adjustedStart, adjustedEnd } = getExtendedStartEndDate(
       range as string,
       start,
-      end
+      end,
+      totalDays
     );
 
+    // console.log(adjustedStart, adjustedEnd, "dates");
+    
+    // res.status(200).json({msg :  "Success" , adjustedStart , adjustedEnd});
     // const page = Number(pageNumber) || 0;
     // const limit = Number(perPage) || 10;
 
@@ -135,20 +137,17 @@ export const getShipmentData = async (req: Request, res: Response) => {
         "Mode",
         "Direction",
         "Container_Count",
-        "Additional_Terms"
+        "Additional_Terms",
       ],
       // offset: page * limit,
       // limit,
     });
 
-    console.log(shipmentData , "shipdata");
-    
-
     const shipmentComparisionCount = await Shipment.count({
       where: {
         [Op.and]: [
           Sequelize.where(fn("DATE", col("Job_Opened")), {
-            [Op.between]: [adjustedStart, endDate],
+            [Op.between]: [adjustedStart, adjustedEnd],
           }),
         ],
       },
@@ -169,7 +168,7 @@ export const getShipmentData = async (req: Request, res: Response) => {
       where: {
         [Op.and]: [
           Sequelize.where(fn("DATE", col("Job_Opened")), {
-            [Op.between]: [adjustedStart, endDate],
+            [Op.between]: [adjustedStart, adjustedEnd],
           }),
           { Mode: "LCL" },
           // {Direction : "Import"}
@@ -191,26 +190,27 @@ export const getShipmentData = async (req: Request, res: Response) => {
       where: {
         [Op.and]: [
           Sequelize.where(fn("DATE", col("Job_Opened")), {
-            [Op.between]: [adjustedStart, endDate],
+            [Op.between]: [adjustedStart, adjustedEnd],
           }),
           { Mode: "FCL" },
         ],
       },
     });
     res.status(200).json({
+      success: true,
       shipmentOpenedCountComparision: shipmentComparisionCount, // the date prrior to the range
       shipmentOpenedCount: shipmentData.length, // from the date range provided from FE
-      success: true,
-      lclOrigianl: currentLCLCount,
-      lclComparision: previousLCLCount,
-      fclOrigianl: currentFLCLCount,
-      fclComparision: previousFCLCount,
+      lclCount : currentLCLCount,
+      lclCountComparision: previousLCLCount,
+      fclCount: currentFLCLCount,
+      fclCountComparision: previousFCLCount,
+      range,
       Date_From,
       Date_To,
       comparisionStart: adjustedStart,
-      comparisionEnd: endDate,
+      comparisionEnd: adjustedEnd,
     });
-  } catch (error : any) {
+  } catch (error: any) {
     console.error("Error in getShipmentData:", error);
     res.status(500).json({
       success: false,
@@ -219,8 +219,3 @@ export const getShipmentData = async (req: Request, res: Response) => {
     });
   }
 };
-
-
-
-
-
