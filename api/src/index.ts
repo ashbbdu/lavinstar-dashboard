@@ -9,7 +9,7 @@ const app = express();
 app.use(express.json())
 const PORT = process.env.PORT;
 
-// Shipment.sync()
+Shipment.sync()
 User.sync()
 app.use("/api/v1/shipment" , shipmentRoutes);
 app.use("/api/v1/user" , userRoutes)

@@ -1,7 +1,10 @@
 import { Request, Response } from "express";
-import { Op, Sequelize, col, fn } from "sequelize";
+import { Op, Sequelize, col, fn, literal } from "sequelize";
 import { Shipment } from "../models/Shipment";
-import {  calculateCustomYears, getExtendedStartEndDate } from "../utils/datematch";
+import {
+  calculateCustomYears,
+  getExtendedStartEndDate,
+} from "../utils/datematch";
 export const getAllShipment = async (req: Request, res: Response) => {
   try {
     const shipmentData = await Shipment.findAll();
@@ -101,6 +104,9 @@ export const getShipmentData = async (req: Request, res: Response) => {
     const start = new Date(Date_From as string);
     const end = new Date(Date_To as string);
 
+    console.log(start, end, "sta");
+    
+
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       res.status(400).json({
         success: false,
@@ -118,95 +124,124 @@ export const getShipmentData = async (req: Request, res: Response) => {
     );
 
     // console.log(adjustedStart, adjustedEnd, "dates");
-    
+
     // res.status(200).json({msg :  "Success" , adjustedStart , adjustedEnd});
     // const page = Number(pageNumber) || 0;
     // const limit = Number(perPage) || 10;
 
     const shipmentData = await Shipment.findAll({
-      where: {
-        [Op.and]: [
-          Sequelize.where(fn("DATE", col("Job_Opened")), {
-            [Op.between]: [start, end],
-          }),
-        ],
-      },
       attributes: [
-        "Shipment_UID",
-        "Trans",
-        "Mode",
-        "Direction",
-        "Container_Count",
-        "Additional_Terms",
+        [
+          fn(
+            "COUNT",
+            literal(
+              `CASE WHEN Mode = 'LCL' AND Direction = 'Import' AND DATE(Job_Opened) BETWEEN '${start}' AND '${end}' THEN 1 END`
+            )
+          ),
+          "currentLCLImportCount",
+        ],
+        [
+          fn(
+            "COUNT",
+            literal(
+              `CASE WHEN Mode = 'LCL' AND Direction = 'Export' AND DATE(Job_Opened) BETWEEN '${start}' AND '${end}' THEN 1 END`
+            )
+          ),
+          "currentLCLExportCount",
+        ],
+        [
+          fn(
+            "COUNT",
+            literal(
+              `CASE WHEN Mode = 'FCL' AND Direction = 'Import' AND DATE(Job_Opened) BETWEEN '${start}' AND '${end}' THEN 1 END`
+            )
+          ),
+          "currentFCLImportCount",
+        ],
+        [
+          fn(
+            "COUNT",
+            literal(
+              `CASE WHEN Mode = 'FCL' AND Direction = 'Export' AND DATE(Job_Opened) BETWEEN '${start}' AND '${end}' THEN 1 END`
+            )
+          ),
+          "currentFCLExportCount",
+        ],
+        [
+          fn(
+            "COUNT",
+            literal(
+              `CASE WHEN Mode = 'LCL' AND Direction = 'Import' AND DATE(Job_Opened) BETWEEN '${adjustedStart}' AND '${adjustedEnd}' THEN 1 END`
+            )
+          ),
+          "previousLCLImportCount",
+        ],
+        [
+          fn(
+            "COUNT",
+            literal(
+              `CASE WHEN Mode = 'LCL' AND Direction = 'Export' AND DATE(Job_Opened) BETWEEN '${adjustedStart}' AND '${adjustedEnd}' THEN 1 END`
+            )
+          ),
+          "previousLCLExportCount",
+        ],
+        [
+          fn(
+            "COUNT",
+            literal(
+              `CASE WHEN Mode = 'FCL' AND Direction = 'Import' AND DATE(Job_Opened) BETWEEN '${adjustedStart}' AND '${adjustedEnd}' THEN 1 END`
+            )
+          ),
+          "previousFCLImportCount",
+        ],
+        [
+          fn(
+            "COUNT",
+            literal(
+              `CASE WHEN Mode = 'FCL' AND Direction = 'Export' AND DATE(Job_Opened) BETWEEN '${adjustedStart}' AND '${adjustedEnd}' THEN 1 END`
+            )
+          ),
+          "previousFCLExportCount",
+        ],
+        [
+          fn(
+            "COUNT",
+            literal(
+              `CASE WHEN DATE(Job_Opened) BETWEEN '${start}' AND '${end}' THEN 1 END`
+            )
+          ),
+          "shipmentOpenedCount",
+        ],
+        [
+          fn(
+            "COUNT",
+            literal(
+              `CASE WHEN DATE(Job_Opened) BETWEEN '${adjustedStart}' AND '${adjustedEnd}' THEN 1 END`
+            )
+          ),
+          "shipmentOpenedCountComparision",
+        ],
       ],
-      // offset: page * limit,
-      // limit,
+      raw: true, // Return plain objects instead of Sequelize models
     });
 
-    const shipmentComparisionCount = await Shipment.count({
-      where: {
-        [Op.and]: [
-          Sequelize.where(fn("DATE", col("Job_Opened")), {
-            [Op.between]: [adjustedStart, adjustedEnd],
-          }),
-        ],
-      },
-    });
+    const response: any = shipmentData[0]; // Since the query will return a single row {}
 
-    const currentLCLCount = await Shipment.count({
-      where: {
-        [Op.and]: [
-          Sequelize.where(fn("DATE", col("Job_Opened")), {
-            [Op.between]: [start, end],
-          }),
-          { Mode: "LCL" },
-        ],
-      },
-    });
-
-    const previousLCLCount = await Shipment.count({
-      where: {
-        [Op.and]: [
-          Sequelize.where(fn("DATE", col("Job_Opened")), {
-            [Op.between]: [adjustedStart, adjustedEnd],
-          }),
-          { Mode: "LCL" },
-          // {Direction : "Import"}
-        ],
-      },
-    });
-
-    const currentFLCLCount = await Shipment.count({
-      where: {
-        [Op.and]: [
-          Sequelize.where(fn("DATE", col("Job_Opened")), {
-            [Op.between]: [start, end],
-          }),
-          { Mode: "FCL" },
-        ],
-      },
-    });
-    const previousFCLCount = await Shipment.count({
-      where: {
-        [Op.and]: [
-          Sequelize.where(fn("DATE", col("Job_Opened")), {
-            [Op.between]: [adjustedStart, adjustedEnd],
-          }),
-          { Mode: "FCL" },
-        ],
-      },
-    });
     res.status(200).json({
       success: true,
-      shipmentOpenedCountComparision: shipmentComparisionCount, // the date prrior to the range
-      shipmentOpenedCount: shipmentData.length, // from the date range provided from FE
-      lclCount : currentLCLCount,
-      lclCountComparision: previousLCLCount,
-      fclCount: currentFLCLCount,
-      fclCountComparision: previousFCLCount,
+      shipmentOpenedCount: response.shipmentOpenedCount,
+      shipmentOpenedCountComparision: response.shipmentOpenedCountComparision,
+      lclImportCount: response.currentLCLImportCount,
+      lclImportCountComparision: response.previousLCLImportCount,
+      lclExportCount: response.currentLCLExportCount,
+      lclExportCountComparision: response.previousLCLExportCount,
+      fclImportCount: response.currentFCLImportCount,
+      fclImportCountComparision: response.previousFCLImportCount,
+      fclExportCount: response.currentFCLExportCount,
+      fclExportCountComparision: response.previousFCLExportCount,
       range,
-      Date_From,
-      Date_To,
+      Date_From: start.toISOString().split("T")[0],
+      Date_To: end.toISOString().split("T")[0],
       comparisionStart: adjustedStart,
       comparisionEnd: adjustedEnd,
     });

@@ -3,10 +3,10 @@
 //     let adjustedEnd: Date = new Date(endDate);
 
 //     switch (range) {
-//         case "today":
-//             adjustedStart = new Date(startDate);
-//             adjustedEnd.setDate(adjustedEnd.getDate() - 1);
-//             break;
+        // case "today":
+        //     adjustedStart = new Date(startDate);
+        //     adjustedEnd.setDate(adjustedEnd.getDate() - 1);
+        //     break;
 
 //         case "week":
 //             adjustedStart = new Date(startDate);
@@ -74,6 +74,11 @@ export const getExtendedStartEndDate = (
   adjustedStart = new Date(startDate);
   adjustedEnd = new Date(startDate);
   switch (range) {
+    case "today":
+            adjustedStart = new Date(startDate);
+            adjustedEnd.setDate(adjustedEnd.getDate() - 1);
+            break;
+            
     case "week":
       adjustedStart = new Date(startDate);
       adjustedStart.setDate(startDate.getDate() - 7);
