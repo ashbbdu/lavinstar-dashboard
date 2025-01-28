@@ -5,22 +5,88 @@ import {
   calculateCustomYears,
   getExtendedStartEndDate,
 } from "../utils/datematch";
-export const getAllShipment = async (req: Request, res: Response) => {
+import { createClient } from "redis";
+
+const redisClient = createClient();
+
+
+// Connect Redis client
+(async () => {
+  await redisClient.connect();
+})();
+
+
+redisClient.on("error", (err) => {
+  console.error("Redis Client Error", err);
+});
+
+
+export const getAllShipments = async (req: Request, res: Response): Promise <any> => {
   try {
-    const shipmentData = await Shipment.findAll();
-    res.json({
-      success: true,
-      shipmentData,
-    });
+    const data = await redisClient.get('allShipments');    
+    
+    if (data) {
+      console.log("Data found in cache");
+
+      return res.json({
+        success: true,
+        shipmentData: JSON.parse(data), 
+      });
+    } else {
+      console.log("Data not found in cache and fetched from the database");
+
+      const shipmentData = await Shipment.findAll();
+      await redisClient.setEx('allShipments', 120, JSON.stringify(shipmentData));
+      return res.json({
+        success: true,
+        shipmentData
+      });
+    }
   } catch (error) {
-    console.log("inside catch");
-    console.log(error);
-    res.json({
+    console.error("Error fetching shipments:", error);
+    res.status(500).json({
       success: false,
-      msg: "Internal Server Error !",
+      msg: "Internal Server Error",
     });
   }
 };
+
+
+
+// export const getAllShipment = async (req: Request, res: Response) => {
+//   try {
+//     const cacheKey = "allShipments";
+
+//     if (redisClient.isOpen) {
+//       const cachedData = await redisClient.get(cacheKey);
+//       if (cachedData) {
+//         // Using return to exit the function after sending a response
+//        return  res.json({
+//           success: true,
+//           shipmentData: JSON.parse(cachedData),
+//         });
+//       }
+//     }
+
+//     const shipmentData = await Shipment.findAll();
+
+//     if (redisClient.isOpen) {
+//       await redisClient.setEx(cacheKey, 300, JSON.stringify(shipmentData));
+//     }
+
+//    return  res.json({
+//       success: true,
+//       shipmentData,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching shipments:", error);
+//     return res.status(500).json({
+//       success: false,
+//       msg: "Internal Server Error!",
+//     });
+//   }
+// };
+
 
 // export const getShipmentData = async (req: Request, res: Response) => {
 //     try {
@@ -105,7 +171,6 @@ export const getShipmentData = async (req: Request, res: Response) => {
     const end = new Date(Date_To as string);
 
     console.log(start, end, "sta");
-    
 
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       res.status(400).json({
