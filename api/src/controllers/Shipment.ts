@@ -1,45 +1,49 @@
 import { Request, Response } from "express";
 import { Op, Sequelize, col, fn, literal } from "sequelize";
 import { Shipment } from "../models/Shipment";
-import {
-  calculateCustomYears,
-  getExtendedStartEndDate,
-} from "../utils/datematch";
+// import {
+//   calculateCustomYears,
+//   getExtendedStartEndDate,
+// } from "../utils/datematch";
 import { createClient } from "redis";
 
 const redisClient = createClient();
-
 
 // Connect Redis client
 (async () => {
   await redisClient.connect();
 })();
 
-
 redisClient.on("error", (err) => {
   console.error("Redis Client Error", err);
 });
 
-
-export const getAllShipments = async (req: Request, res: Response): Promise <any> => {
+export const getAllShipments = async (
+  req: Request,
+  res: Response
+): Promise<any> => {
   try {
-    const data = await redisClient.get('allShipments');    
-    
+    const data = await redisClient.get("allShipments");
+
     if (data) {
       console.log("Data found in cache");
 
       return res.json({
         success: true,
-        shipmentData: JSON.parse(data), 
+        shipmentData: JSON.parse(data),
       });
     } else {
       console.log("Data not found in cache and fetched from the database");
 
       const shipmentData = await Shipment.findAll();
-      await redisClient.setEx('allShipments', 120, JSON.stringify(shipmentData));
+      await redisClient.setEx(
+        "allShipments",
+        300,
+        JSON.stringify(shipmentData)
+      );
       return res.json({
         success: true,
-        shipmentData
+        shipmentData,
       });
     }
   } catch (error) {
@@ -50,8 +54,6 @@ export const getAllShipments = async (req: Request, res: Response): Promise <any
     });
   }
 };
-
-
 
 // export const getAllShipment = async (req: Request, res: Response) => {
 //   try {
@@ -86,7 +88,6 @@ export const getAllShipments = async (req: Request, res: Response): Promise <any
 //     });
 //   }
 // };
-
 
 // export const getShipmentData = async (req: Request, res: Response) => {
 //     try {
@@ -156,43 +157,466 @@ export const getAllShipments = async (req: Request, res: Response): Promise <any
 //     }
 // };
 
-export const getShipmentData = async (req: Request, res: Response) => {
+// export const getShipmentData = async (req: Request, res: Response) => {
+//   try {
+//     const { Date_From, Date_To, range, pageNumber, perPage } = req.query;
+
+//     if (!Date_From || !Date_To) {
+//       res.status(401).json({
+//         success: false,
+//         message: "Please provide the required fields!",
+//       });
+//     }
+
+//     const start = new Date(Date_From as string);
+//     const end = new Date(Date_To as string);
+
+//     const formatDate = (date : any) => {
+//       const d = new Date(date);
+//       return d.toISOString().split('T')[0]; // '2024-08-21'
+//     };
+
+//     console.log(start, end, "sta");
+
+//     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+//       res.status(400).json({
+//         success: false,
+//         message: "Invalid dates provided!",
+//       });
+//     }
+
+//     const totalDays = calculateCustomYears(start, end);
+
+//     const { adjustedStart, adjustedEnd } = getExtendedStartEndDate(
+//       range as string,
+//       start,
+//       end,
+//       totalDays
+//     );
+
+//     const formattedStart = formatDate(start);
+//     const formattedEnd = formatDate(end);
+//     const formattedAdjustedStart = formatDate(adjustedStart);
+//     const formattedAdjustedEnd = formatDate(adjustedEnd);
+
+//     console.log(adjustedStart, adjustedEnd , formattedAdjustedEnd , "enddddd");
+
+//     // console.log(adjustedStart, adjustedEnd, "dates");
+
+//     // res.status(200).json({msg :  "Success" , adjustedStart , adjustedEnd});
+//     // const page = Number(pageNumber) || 0;
+//     // const limit = Number(perPage) || 10;
+//     const shipmentData = await Shipment.findAll({
+//       attributes: [
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN Mode = 'LCL'
+//                 AND Direction = 'Import'
+//                 AND (DATE(Job_Opened) BETWEEN '${formattedStart}' AND '${formattedEnd}'
+//                   OR DATE(Job_Opened) = '${formattedStart}'
+//                   OR DATE(Job_Opened) = '${formattedEnd}')
+//                 THEN 1 END`
+//             )
+//           ),
+//           "currentLCLImportCount",
+//         ],
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN Mode = 'LCL'
+//                 AND Direction = 'Export'
+//                 AND (DATE(Job_Opened) BETWEEN '${formattedStart}' AND '${formattedEnd}'
+//                   OR DATE(Job_Opened) = '${formattedStart}'
+//                   OR DATE(Job_Opened) = '${formattedEnd}')
+//                 THEN 1 END`
+//             )
+//           ),
+//           "currentLCLExportCount",
+//         ],
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN Mode = 'FCL'
+//                 AND Direction = 'Import'
+//                 AND (DATE(Job_Opened) BETWEEN '${formattedStart}' AND '${formattedEnd}'
+//                   OR DATE(Job_Opened) = '${formattedStart}'
+//                   OR DATE(Job_Opened) = '${formattedEnd}')
+//                 THEN 1 END`
+//             )
+//           ),
+//           "currentFCLImportCount",
+//         ],
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN Mode = 'FCL'
+//                 AND Direction = 'Export'
+//                 AND (DATE(Job_Opened) BETWEEN '${formattedStart}' AND '${formattedEnd}'
+//                   OR DATE(Job_Opened) = '${formattedStart}'
+//                   OR DATE(Job_Opened) = '${formattedEnd}')
+//                 THEN 1 END`
+//             )
+//           ),
+//           "currentFCLExportCount",
+//         ],
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN Mode = 'LCL'
+//                 AND Direction = 'Import'
+//                 AND (DATE(Job_Opened) BETWEEN '${formattedAdjustedStart}' AND '${formattedAdjustedEnd}'
+//                   OR DATE(Job_Opened) = '${formattedAdjustedStart}'
+//                   OR DATE(Job_Opened) = '${formattedAdjustedEnd}')
+//                 THEN 1 END`
+//             )
+//           ),
+//           "previousLCLImportCount",
+//         ],
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN Mode = 'LCL'
+//                 AND Direction = 'Export'
+//                 AND (DATE(Job_Opened) BETWEEN '${formattedAdjustedStart}' AND '${formattedAdjustedEnd}'
+//                   OR DATE(Job_Opened) = '${formattedAdjustedStart}'
+//                   OR DATE(Job_Opened) = '${formattedAdjustedEnd}')
+//                 THEN 1 END`
+//             )
+//           ),
+//           "previousLCLExportCount",
+//         ],
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN Mode = 'FCL'
+//                 AND Direction = 'Import'
+//                 AND (DATE(Job_Opened) BETWEEN '${formattedAdjustedStart}' AND '${formattedAdjustedEnd}'
+//                   OR DATE(Job_Opened) = '${formattedAdjustedStart}'
+//                   OR DATE(Job_Opened) = '${formattedAdjustedEnd}')
+//                 THEN 1 END`
+//             )
+//           ),
+//           "previousFCLImportCount",
+//         ],
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN Mode = 'FCL'
+//                 AND Direction = 'Export'
+//                 AND (DATE(Job_Opened) BETWEEN '${formattedAdjustedStart}' AND '${formattedAdjustedEnd}'
+//                   OR DATE(Job_Opened) = '${formattedAdjustedStart}'
+//                   OR DATE(Job_Opened) = '${formattedAdjustedEnd}')
+//                 THEN 1 END`
+//             )
+//           ),
+//           "previousFCLExportCount",
+//         ],
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN DATE(Job_Opened) BETWEEN '${formattedStart}' AND '${formattedEnd}'
+//                 OR DATE(Job_Opened) = '${formattedStart}'
+//                 OR DATE(Job_Opened) = '${formattedEnd}'
+//                 THEN 1 END`
+//             )
+//           ),
+//           "shipmentOpenedCount",
+//         ],
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN DATE(Job_Opened) BETWEEN '${formattedAdjustedStart}' AND '${formattedAdjustedEnd}'
+//                 OR DATE(Job_Opened) = '${formattedAdjustedStart}'
+//                 OR DATE(Job_Opened) = '${formattedAdjustedEnd}'
+//                 THEN 1 END`
+//             )
+//           ),
+//           "shipmentOpenedCountComparision",
+//         ],
+//       ],
+//       raw: true, // Return plain objects instead of Sequelize models
+//     });
+
+//     const response: any = shipmentData[0]; // Since the query will return a single row {}
+
+//     res.status(200).json({
+//       success: true,
+//       shipmentOpenedCount: response.shipmentOpenedCount,
+//       shipmentOpenedCountComparision: response.shipmentOpenedCountComparision,
+//       lclImportCount: response.currentLCLImportCount,
+//       lclImportCountComparision: response.previousLCLImportCount,
+//       lclExportCount: response.currentLCLExportCount,
+//       lclExportCountComparision: response.previousLCLExportCount,
+//       fclImportCount: response.currentFCLImportCount,
+//       fclImportCountComparision: response.previousFCLImportCount,
+//       fclExportCount: response.currentFCLExportCount,
+//       fclExportCountComparision: response.previousFCLExportCount,
+//       range,
+//       Date_From: start.toISOString().split("T")[0],
+//       Date_To: end.toISOString().split("T")[0],
+//       comparisionStart: adjustedStart,
+//       comparisionEnd: adjustedEnd,
+//     });
+//   } catch (error: any) {
+//     console.error("Error in getShipmentData:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error!",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// Updated code
+
+// export const getShipmentData = async (req: Request, res: Response) => {
+//   try {
+//     const { Date_From, Date_To, range, pageNumber, perPage } = req.query;
+
+//     if (!Date_From || !Date_To) {
+//       res.status(401).json({
+//         success: false,
+//         message: "Please provide the required fields!",
+//       });
+//     }
+
+//     const formattedStart = "2024-08-21 00:00:00"  ;
+//     const formattedEnd = "2024-09-21 23:59:59";
+//     const formattedAdjustedStart = "2024-07-21 00:00:00";
+//     const formattedAdjustedEnd = "2024-08-21 23:59:59";
+
+//     const shipmentData = await Shipment.findAll({
+//       attributes: [
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN Mode = 'LCL'
+//                 AND Direction = 'Import'
+//                 AND (DATE(Job_Opened) BETWEEN '${formattedStart}' AND '${formattedEnd}'
+//                   OR DATE(Job_Opened) = '${formattedStart}'
+//                   OR DATE(Job_Opened) = '${formattedEnd}')
+//                 THEN 1 END`
+//             )
+//           ),
+//           "currentLCLImportCount",
+//         ],
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN Mode = 'LCL'
+//                 AND Direction = 'Export'
+//                 AND (DATE(Job_Opened) BETWEEN '${formattedStart}' AND '${formattedEnd}'
+//                   OR DATE(Job_Opened) = '${formattedStart}'
+//                   OR DATE(Job_Opened) = '${formattedEnd}')
+//                 THEN 1 END`
+//             )
+//           ),
+//           "currentLCLExportCount",
+//         ],
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN Mode = 'FCL'
+//                 AND Direction = 'Import'
+//                 AND (DATE(Job_Opened) BETWEEN '${formattedStart}' AND '${formattedEnd}'
+//                   OR DATE(Job_Opened) = '${formattedStart}'
+//                   OR DATE(Job_Opened) = '${formattedEnd}')
+//                 THEN 1 END`
+//             )
+//           ),
+//           "currentFCLImportCount",
+//         ],
+
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN Mode = 'FCL'
+//                 AND Direction = 'Export'
+//                 AND DATE(Job_Opened) BETWEEN '${formattedStart}' AND '${formattedEnd}'
+//                 THEN 1 END`
+//             )
+//           ),
+//           "currentFCLExportCount",
+//         ],
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN Mode = 'LCL'
+//                 AND Direction = 'Import'
+//                 AND (DATE(Job_Opened) BETWEEN '${formattedAdjustedStart}' AND '${formattedAdjustedEnd}'
+//                   OR DATE(Job_Opened) = '${formattedAdjustedStart}'
+//                   OR DATE(Job_Opened) = '${formattedAdjustedEnd}')
+//                 THEN 1 END`
+//             )
+//           ),
+//           "previousLCLImportCount",
+//         ],
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN Mode = 'LCL'
+//                 AND Direction = 'Export'
+//                 AND (DATE(Job_Opened) BETWEEN '${formattedAdjustedStart}' AND '${formattedAdjustedEnd}'
+//                   OR DATE(Job_Opened) = '${formattedAdjustedStart}'
+//                   OR DATE(Job_Opened) = '${formattedAdjustedEnd}')
+//                 THEN 1 END`
+//             )
+//           ),
+//           "previousLCLExportCount",
+//         ],
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN Mode = 'FCL'
+//                 AND Direction = 'Import'
+//                 AND (DATE(Job_Opened) BETWEEN '${formattedAdjustedStart}' AND '${formattedAdjustedEnd}'
+//                   OR DATE(Job_Opened) = '${formattedAdjustedStart}'
+//                   OR DATE(Job_Opened) = '${formattedAdjustedEnd}')
+//                 THEN 1 END`
+//             )
+//           ),
+//           "previousFCLImportCount",
+//         ],
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN Mode = 'FCL'
+//                 AND Direction = 'Export'
+//                 AND (DATE(Job_Opened) BETWEEN '${formattedAdjustedStart}' AND '${formattedAdjustedEnd}'
+//                   OR DATE(Job_Opened) = '${formattedAdjustedStart}'
+//                   OR DATE(Job_Opened) = '${formattedAdjustedEnd}')
+//                 THEN 1 END`
+//             )
+//           ),
+//           "previousFCLExportCount",
+//         ],
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN DATE(Job_Opened) BETWEEN '${formattedStart}' AND '${formattedEnd}'
+//                 OR DATE(Job_Opened) = '${formattedStart}'
+//                 OR DATE(Job_Opened) = '${formattedEnd}'
+//                 THEN 1 END`
+//             )
+//           ),
+//           "shipmentOpenedCount",
+//         ],
+//         [
+//           fn(
+//             "COUNT",
+//             literal(
+//               `CASE
+//                 WHEN DATE(Job_Opened) BETWEEN '${formattedAdjustedStart}' AND '${formattedAdjustedEnd}'
+//                 OR DATE(Job_Opened) = '${formattedAdjustedStart}'
+//                 OR DATE(Job_Opened) = '${formattedAdjustedEnd}'
+//                 THEN 1 END`
+//             )
+//           ),
+//           "shipmentOpenedCountComparision",
+//         ],
+//       ],
+//       raw: true, // Return plain objects instead of Sequelize models
+//     });
+
+//     const response: any = shipmentData[0];
+
+//     res.status(200).json({
+//       success: true,
+//       shipmentOpenedCount: response.shipmentOpenedCount,
+//       shipmentOpenedCountComparision: response.shipmentOpenedCountComparision,
+//       lclImportCount: response.currentLCLImportCount,
+//       lclImportCountComparision: response.previousLCLImportCount,
+//       lclExportCount: response.currentLCLExportCount,
+//       lclExportCountComparision: response.previousLCLExportCount,
+//       fclImportCount: response.currentFCLImportCount,
+//       fclImportCountComparision: response.previousFCLImportCount,
+//       fclExportCount: response.currentFCLExportCount,
+//       fclExportCountComparision: response.previousFCLExportCount,
+//       range,
+//       Date_From: formattedStart,
+//       Date_To: formattedEnd,
+//       comparisionStart: formattedAdjustedStart,
+//       comparisionEnd: formattedAdjustedEnd,
+//     });
+//   } catch (error: any) {
+//     console.error("Error in getShipmentData:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error!",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// Convert the following code to use Redis caching
+
+export const getShipmentData = async (req: Request, res: Response) : Promise <any> => {
   try {
-    const { Date_From, Date_To, range, pageNumber, perPage } = req.query;
+    const { Date_From, Date_To, range } = req.query;
 
     if (!Date_From || !Date_To) {
-      res.status(401).json({
+      return res.status(400).json({
         success: false,
         message: "Please provide the required fields!",
       });
     }
 
-    const start = new Date(Date_From as string);
-    const end = new Date(Date_To as string);
+    const formattedStart = "2024-08-21 00:00:00";
+    const formattedEnd = "2024-09-21 23:59:59";
+    const formattedAdjustedStart = "2024-07-21 00:00:00";
+    const formattedAdjustedEnd = "2024-08-21 23:59:59";
 
-    console.log(start, end, "sta");
+    const cacheKey = `filteredRangeData`;
 
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      res.status(400).json({
-        success: false,
-        message: "Invalid dates provided!",
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      console.log("From cache");
+      return res.status(200).json({
+        success: true,
+        ...JSON.parse(cachedData),
       });
     }
 
-    const totalDays = calculateCustomYears(start, end);
-
-    const { adjustedStart, adjustedEnd } = getExtendedStartEndDate(
-      range as string,
-      start,
-      end,
-      totalDays
-    );
-
-    // console.log(adjustedStart, adjustedEnd, "dates");
-
-    // res.status(200).json({msg :  "Success" , adjustedStart , adjustedEnd});
-    // const page = Number(pageNumber) || 0;
-    // const limit = Number(perPage) || 10;
+    console.log("Cache miss. Fetching from database.");
 
     const shipmentData = await Shipment.findAll({
       attributes: [
@@ -200,7 +624,13 @@ export const getShipmentData = async (req: Request, res: Response) => {
           fn(
             "COUNT",
             literal(
-              `CASE WHEN Mode = 'LCL' AND Direction = 'Import' AND DATE(Job_Opened) BETWEEN '${start}' AND '${end}' THEN 1 END`
+              `CASE 
+                      WHEN Mode = 'LCL' 
+                      AND Direction = 'Import' 
+                      AND (DATE(Job_Opened) BETWEEN '${formattedStart}' AND '${formattedEnd}' 
+                        OR DATE(Job_Opened) = '${formattedStart}' 
+                        OR DATE(Job_Opened) = '${formattedEnd}')
+                      THEN 1 END`
             )
           ),
           "currentLCLImportCount",
@@ -209,7 +639,13 @@ export const getShipmentData = async (req: Request, res: Response) => {
           fn(
             "COUNT",
             literal(
-              `CASE WHEN Mode = 'LCL' AND Direction = 'Export' AND DATE(Job_Opened) BETWEEN '${start}' AND '${end}' THEN 1 END`
+              `CASE 
+                      WHEN Mode = 'LCL' 
+                      AND Direction = 'Export' 
+                      AND (DATE(Job_Opened) BETWEEN '${formattedStart}' AND '${formattedEnd}' 
+                      OR DATE(Job_Opened) = '${formattedStart}' 
+                      OR DATE(Job_Opened) = '${formattedEnd}')
+                      THEN 1 END`
             )
           ),
           "currentLCLExportCount",
@@ -218,16 +654,27 @@ export const getShipmentData = async (req: Request, res: Response) => {
           fn(
             "COUNT",
             literal(
-              `CASE WHEN Mode = 'FCL' AND Direction = 'Import' AND DATE(Job_Opened) BETWEEN '${start}' AND '${end}' THEN 1 END`
+              `CASE 
+                      WHEN Mode = 'FCL' 
+                      AND Direction = 'Import' 
+                      AND (DATE(Job_Opened) BETWEEN '${formattedStart}' AND '${formattedEnd}' 
+                        OR DATE(Job_Opened) = '${formattedStart}' 
+                        OR DATE(Job_Opened) = '${formattedEnd}')
+                      THEN 1 END`
             )
           ),
           "currentFCLImportCount",
         ],
+
         [
           fn(
             "COUNT",
             literal(
-              `CASE WHEN Mode = 'FCL' AND Direction = 'Export' AND DATE(Job_Opened) BETWEEN '${start}' AND '${end}' THEN 1 END`
+              `CASE 
+                      WHEN Mode = 'FCL' 
+                      AND Direction = 'Export' 
+                      AND DATE(Job_Opened) BETWEEN '${formattedStart}' AND '${formattedEnd}'
+                      THEN 1 END`
             )
           ),
           "currentFCLExportCount",
@@ -236,7 +683,13 @@ export const getShipmentData = async (req: Request, res: Response) => {
           fn(
             "COUNT",
             literal(
-              `CASE WHEN Mode = 'LCL' AND Direction = 'Import' AND DATE(Job_Opened) BETWEEN '${adjustedStart}' AND '${adjustedEnd}' THEN 1 END`
+              `CASE 
+                      WHEN Mode = 'LCL' 
+                      AND Direction = 'Import' 
+                      AND (DATE(Job_Opened) BETWEEN '${formattedAdjustedStart}' AND '${formattedAdjustedEnd}' 
+                        OR DATE(Job_Opened) = '${formattedAdjustedStart}' 
+                        OR DATE(Job_Opened) = '${formattedAdjustedEnd}')
+                      THEN 1 END`
             )
           ),
           "previousLCLImportCount",
@@ -245,7 +698,13 @@ export const getShipmentData = async (req: Request, res: Response) => {
           fn(
             "COUNT",
             literal(
-              `CASE WHEN Mode = 'LCL' AND Direction = 'Export' AND DATE(Job_Opened) BETWEEN '${adjustedStart}' AND '${adjustedEnd}' THEN 1 END`
+              `CASE 
+                      WHEN Mode = 'LCL' 
+                      AND Direction = 'Export' 
+                      AND (DATE(Job_Opened) BETWEEN '${formattedAdjustedStart}' AND '${formattedAdjustedEnd}' 
+                        OR DATE(Job_Opened) = '${formattedAdjustedStart}' 
+                        OR DATE(Job_Opened) = '${formattedAdjustedEnd}')
+                      THEN 1 END`
             )
           ),
           "previousLCLExportCount",
@@ -254,7 +713,13 @@ export const getShipmentData = async (req: Request, res: Response) => {
           fn(
             "COUNT",
             literal(
-              `CASE WHEN Mode = 'FCL' AND Direction = 'Import' AND DATE(Job_Opened) BETWEEN '${adjustedStart}' AND '${adjustedEnd}' THEN 1 END`
+              `CASE 
+                      WHEN Mode = 'FCL' 
+                      AND Direction = 'Import' 
+                      AND (DATE(Job_Opened) BETWEEN '${formattedAdjustedStart}' AND '${formattedAdjustedEnd}' 
+                        OR DATE(Job_Opened) = '${formattedAdjustedStart}' 
+                        OR DATE(Job_Opened) = '${formattedAdjustedEnd}')
+                      THEN 1 END`
             )
           ),
           "previousFCLImportCount",
@@ -263,7 +728,13 @@ export const getShipmentData = async (req: Request, res: Response) => {
           fn(
             "COUNT",
             literal(
-              `CASE WHEN Mode = 'FCL' AND Direction = 'Export' AND DATE(Job_Opened) BETWEEN '${adjustedStart}' AND '${adjustedEnd}' THEN 1 END`
+              `CASE 
+                      WHEN Mode = 'FCL' 
+                      AND Direction = 'Export' 
+                      AND (DATE(Job_Opened) BETWEEN '${formattedAdjustedStart}' AND '${formattedAdjustedEnd}' 
+                        OR DATE(Job_Opened) = '${formattedAdjustedStart}' 
+                        OR DATE(Job_Opened) = '${formattedAdjustedEnd}')
+                      THEN 1 END`
             )
           ),
           "previousFCLExportCount",
@@ -272,7 +743,11 @@ export const getShipmentData = async (req: Request, res: Response) => {
           fn(
             "COUNT",
             literal(
-              `CASE WHEN DATE(Job_Opened) BETWEEN '${start}' AND '${end}' THEN 1 END`
+              `CASE 
+                      WHEN DATE(Job_Opened) BETWEEN '${formattedStart}' AND '${formattedEnd}' 
+                      OR DATE(Job_Opened) = '${formattedStart}' 
+                      OR DATE(Job_Opened) = '${formattedEnd}' 
+                      THEN 1 END`
             )
           ),
           "shipmentOpenedCount",
@@ -281,7 +756,11 @@ export const getShipmentData = async (req: Request, res: Response) => {
           fn(
             "COUNT",
             literal(
-              `CASE WHEN DATE(Job_Opened) BETWEEN '${adjustedStart}' AND '${adjustedEnd}' THEN 1 END`
+              `CASE 
+                      WHEN DATE(Job_Opened) BETWEEN '${formattedAdjustedStart}' AND '${formattedAdjustedEnd}' 
+                      OR DATE(Job_Opened) = '${formattedAdjustedStart}' 
+                      OR DATE(Job_Opened) = '${formattedAdjustedEnd}' 
+                      THEN 1 END`
             )
           ),
           "shipmentOpenedCountComparision",
@@ -290,10 +769,9 @@ export const getShipmentData = async (req: Request, res: Response) => {
       raw: true, // Return plain objects instead of Sequelize models
     });
 
-    const response: any = shipmentData[0]; // Since the query will return a single row {}
-
-    res.status(200).json({
-      success: true,
+    const response: any = shipmentData[0];
+    
+    const responseData = {
       shipmentOpenedCount: response.shipmentOpenedCount,
       shipmentOpenedCountComparision: response.shipmentOpenedCountComparision,
       lclImportCount: response.currentLCLImportCount,
@@ -305,10 +783,21 @@ export const getShipmentData = async (req: Request, res: Response) => {
       fclExportCount: response.currentFCLExportCount,
       fclExportCountComparision: response.previousFCLExportCount,
       range,
-      Date_From: start.toISOString().split("T")[0],
-      Date_To: end.toISOString().split("T")[0],
-      comparisionStart: adjustedStart,
-      comparisionEnd: adjustedEnd,
+      Date_From: formattedStart,
+      Date_To: formattedEnd,
+      comparisionStart: formattedAdjustedStart,
+      comparisionEnd: formattedAdjustedEnd,
+    };
+
+    // Cache the response in Redis for 1 hour (3600 seconds)
+    await redisClient.setEx(
+      "filteredRangeData",
+      300,
+      JSON.stringify(responseData)
+    );
+    res.status(200).json({
+      success: true,
+      ...responseData,
     });
   } catch (error: any) {
     console.error("Error in getShipmentData:", error);

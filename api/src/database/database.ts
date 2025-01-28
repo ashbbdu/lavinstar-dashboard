@@ -4,7 +4,9 @@ dotenv.config();
 
 const sequelize = new Sequelize(process.env.DB_NAME as string, process.env.USER_NAME as string, 'ash@Compunnel09' , {
     host : "localhost",
-    dialect: 'mysql'
+    dialect: 'mysql',
+    timezone: "+00:00",
+    logging: false 
   });  
 sequelize.authenticate()
   .then(() => {
