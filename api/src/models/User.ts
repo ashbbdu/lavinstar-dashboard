@@ -1,31 +1,3 @@
-// import { DataTypes } from 'sequelize';
-// import sequelize from '../database/database';
-
-// export const User = sequelize.define(
-//     'User',
-//     {
-//         firstName: {
-//             type: DataTypes.STRING,
-//             allowNull: false,
-//         },
-//         lastName: {
-//             type: DataTypes.STRING,
-//         },
-//         email: {
-//             type: DataTypes.STRING,
-//             allowNull: false
-//         }
-//     },
-
-
-
-// );
-
-
-
-// console.log(User === sequelize.models.User); 
-
-
 import { DataTypes, Model } from "sequelize";
 import sequelize from "../database/database";
 import { IUser, IUserCreationAttributes } from "../interface/user";
@@ -96,7 +68,7 @@ export class User extends Model<IUser, IUserCreationAttributes> implements IUser
     },
     {
       tableName: "users",
-      sequelize, // passing the sequelize instance to the model
+      sequelize,
       timestamps: true,
     }
   );
