@@ -789,7 +789,6 @@ export const getShipmentData = async (req: Request, res: Response) : Promise <an
       comparisionEnd: formattedAdjustedEnd,
     };
 
-    // Cache the response in Redis for 1 hour (3600 seconds)
     await redisClient.setEx(
       "filteredRangeData",
       300,
