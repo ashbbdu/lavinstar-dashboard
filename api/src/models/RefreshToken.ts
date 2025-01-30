@@ -3,18 +3,16 @@ import sequelize from "../database/database";
 
 
 
-// Interface for refresh token model (for typescript)
 interface IRefreshTokenAttributes {
   id: number;
-  userId: number;  // Foreign Key to Users table
-  refreshToken: string;  // The actual refresh token
-  expiresAt: Date;  // Expiry of the refresh token
+  userId: number;  
+  refreshToken: string;  
+  expiresAt: Date; 
 }
 
 interface IRefreshTokenCreationAttributes
   extends Optional<IRefreshTokenAttributes, "id"> {}
 
-// Sequelize Model definition
 export class RefreshToken extends Model<IRefreshTokenAttributes, IRefreshTokenCreationAttributes> {
   public id!: number;
   public userId!: number;
