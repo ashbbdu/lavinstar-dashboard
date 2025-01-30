@@ -2,8 +2,8 @@ import { Request, Response } from "express";
 import { User } from "../models/User";
 export const createUser = async (req : Request , res : Response) => {
     try {
-        const { firstName , lastName , email } = req.body;
-        const addUser =  User.create({ firstName, lastName , email });
+        const { first_name , last_name , email , password } = req.body;
+        const addUser =  User.create({ first_name, last_name , email , is_active : true , password });
         res.json({
             success : true,
             user : addUser
