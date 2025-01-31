@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import jwt from "jsonwebtoken";
+import jwt , { TokenExpiredError } from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
 import { User } from "../models/User";
@@ -11,6 +11,8 @@ interface JwtPayload {
   id: number;
 }
 
+
+// TODO , if refresh token exist in db then dont create new refresh token , this is not yet implemented that is why causing issue
 export const login = async (req: Request, res: Response): Promise<any> => {
   const { email, password, rememberMe } = req.body;
 
@@ -27,6 +29,7 @@ export const login = async (req: Request, res: Response): Promise<any> => {
       return res.status(400).json({ message: "Incorrect password" });
     }
 
+
     const payload = {
       id: user.id,
       email: user.email,
@@ -37,7 +40,7 @@ export const login = async (req: Request, res: Response): Promise<any> => {
     const accessToken = jwt.sign(
       payload,
       process.env.JWT_SECRET_KEY as string,
-      { expiresIn: "1h" }
+      { expiresIn: "7h" }
     );
 
     const refreshTokenExpiry = rememberMe ? "30d" : "7d";
@@ -65,63 +68,69 @@ export const login = async (req: Request, res: Response): Promise<any> => {
   }
 };
 
-export const refreshToken = async (
-  req: Request,
-  res: Response
-): Promise<any> => {
-  const token =
-    req.cookies?.token ||
-    req.body.token ||
-    req.header("Authorization")?.split(" ")[1];
-  console.log(token);
 
-  if (!token) {
-    return res.status(401).json({ message: "No token provided" });
-  }
 
-  try {
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET_KEY as string
-    ) as JwtPayload;
-
-    console.log(decoded);
-    
-    const userId = decoded.id;
-
-    const user = await User.findByPk(userId);
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+export const refreshToken = async (req: Request, res: Response): Promise<any> => {
+    const token =
+    req?.body?.token ||
+    req?.cookies?.token ||
+    req?.header("Authorization")?.replace("Bearer ", "");
+      
+  
+    if (!token) {
+      return res.status(401).json({ message: "No token provided" });
     }
+  
+    try {
+      const decoded = jwt.verify(
+        token,
+        process.env.JWT_SECRET_KEY as string
+      ) as JwtPayload;
+  
+      const userId = decoded.id;
+  
+      // Check if the user exists
+      const user = await User.findByPk(userId);
+      console.log(user , "user");
+      
+      const payload = {
+        id: user?.dataValues.id,
+        email: user?.dataValues.email,
+        first_name: user?.dataValues.first_name,
+        last_name: user?.dataValues.last_name,
+        is_active: user?.dataValues.is_active,
+      };
 
-    const storedRefreshToken = await RefreshToken.findOne({
-      where: { userId: user.id },
-    });
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
 
-      if (!storedRefreshToken) {
+      const storedRefreshToken = await RefreshToken.findOne({ where: { userId: user.id } });
+  
+      if (!storedRefreshToken || storedRefreshToken.refreshToken !== token) {
         return res.status(403).json({ message: "Invalid refresh token" });
       }
 
-      const newAccessToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET_KEY as string, {
-        expiresIn: "1h", 
+      const newAccessToken = jwt.sign(payload, process.env.JWT_SECRET_KEY as string, {
+        expiresIn: "1h",
       });
-
-      const newRefreshToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET_KEY as string, {
-        expiresIn: "7d", 
+  
+      const newRefreshToken = jwt.sign(payload, process.env.JWT_SECRET_KEY as string, {
+        expiresIn: "7d",
       });
-
-      await RefreshToken.update(
-        { refreshToken: newRefreshToken }, 
-        { where: { userId: user.id } }
-      );
-
+  
+      await RefreshToken.update({ refreshToken: newRefreshToken }, { where: { userId: user.id } });
+  
       return res.status(200).json({
         accessToken: newAccessToken,
         refreshToken: newRefreshToken,
       });
-  } catch (error) {
-    console.error("Error refreshing token:", error);
-    return res.status(500).json({ message: "Internal server error" });
-  }
-};
+    } catch (error) {
+      if (error instanceof TokenExpiredError) {
+        return res.status(401).json({ message: "Refresh token expired. Please log in again." });
+      }
+      console.error("Error refreshing token:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  };
